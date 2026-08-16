@@ -173,6 +173,7 @@ Consumer ②          memory-section      system-prompt section,会话开启时�
 - **worktree 隔离**:``custom/workspace-worktree``:workspace 派生 worktree;``sandbox-policy.workspaceRoot`` 在自己的 patch 层按 id 整行重声明指向 worktree;subagent provider 加 ``workspace: isolate`` 配置。
 - **多用户/团队平面**:``custom/host-auth``:host 侧 auth 中间件 + 会话 ACL(挂 ``session/*`` 投影);共享链接 = 只读投影消费者;需独立威胁模型 Agent Note;最后做。
 - **eval 运行器**:``custom/eval-runner``:复用 ``test:snapshot`` 基建 + headless 批量运行 + LLM 裁判评分 + 报告落 ``storage/``;独立 profile 入口。
+- **任意文件附件**(2026-08-16 立项):当前 wire/存储/模型面仅图片(``PromptContentPart`` 只有 image;``AttachmentStore`` 只有 ``saveImage``)。补齐需三层:wire 增加 file part → 存储缝增加 ``saveFile`` + 文本提取/占位策略 → 前端 accept 放开。前端可见入口已由 ``custom/ui-conversation`` 补上(回形针按钮)。
 
 ---
 
