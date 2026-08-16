@@ -49,6 +49,9 @@ const DEFAULT_WATCH_MAX_PROJECTS = 128
 export const name = 'skill-filesystem'
 export const inject = ['skills', 'settings']
 
+/** Every discovery source the skill provider knows. */
+const SKILL_SOURCES = ['project-dsh', 'project-agents', 'custom', 'user-dsh', 'user-agents', 'bundled'] as const
+
 /** Local filesystem skill provider configuration. */
 export interface Config {
   /** Unique provider name. Defaults to `local`. */
@@ -163,7 +166,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     excludeNames: z.array(z.string()).default([]),
   }), {
     base: {
-      includeSources: config.includeSources,
+      includeSources: config.includeSources ?? [...SKILL_SOURCES],
       excludeNames: config.excludeNames ?? [],
     },
   })

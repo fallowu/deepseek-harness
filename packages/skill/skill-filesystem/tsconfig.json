@@ -10,6 +10,7 @@
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
     { "path": "../../fs/fs" },
+    { "path": "../../settings/settings" },
     { "path": "../../util/home-paths" },
     { "path": "../skill" },
     { "path": "../../runtime-diagnostics/invariants" }
