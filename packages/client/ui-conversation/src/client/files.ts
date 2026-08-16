@@ -51,12 +51,20 @@ const nextId = (): string => {
   return 'file-' + String(attachmentSeq)
 }
 
-/** Whether one browser file is a PDF by extension or declared media type. */
+/**
+ * Whether one browser file is a PDF by extension or declared media type.
+ * @param file - the browser file to classify.
+ * @returns true when the file should take the PDF extraction path.
+ */
 export function isPdf(file: File): boolean {
   return file.type === 'application/pdf' || PDF_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext))
 }
 
-/** Whether one browser file is read directly as UTF-8 text. */
+/**
+ * Whether one browser file is read directly as UTF-8 text.
+ * @param file - the browser file to classify.
+ * @returns true when the file should take the plain-text read path.
+ */
 export function isTextLike(file: File): boolean {
   if (file.type === '') return false
   return TEXT_MEDIA_TYPES.has(file.type) || file.type.startsWith('text/')
@@ -109,7 +117,11 @@ export async function extractFile(file: File): Promise<FileIntake> {
   return { ok: false, rejection: { reason: 'unsupported', name: file.name, detail: file.type } }
 }
 
-/** Render one extracted draft as the model-visible text block payload. */
+/**
+ * Render one extracted draft as the model-visible text block payload.
+ * @param file - the extracted document draft.
+ * @returns the text sent as one prompt block, header line plus body.
+ */
 export function renderFileText(file: DraftFileText): string {
   const pages = file.pages === undefined ? '' : ', ' + String(file.pages) + ' pages'
   return '[attached file: ' + file.name + pages + ']\n' + file.text

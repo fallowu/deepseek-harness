@@ -20,16 +20,27 @@ export const MCP_SERVERS_SETTINGS_NAMESPACE = settingsNamespace('mcp-servers')
 
 /** One server entry: the single-server config minus the redundant serverName. */
 interface ServerEntry {
+  /** Transport selecting the connection shape; stdio spawns a child, streamable-http dials a URL. */
   transport: 'stdio' | 'streamable-http'
+  /** stdio only: executable spawned for the server. */
   command?: string
+  /** stdio only: arguments passed to the command. */
   args?: string[]
+  /** stdio only: extra environment merged over the scrubbed ambient environment. */
   env?: Record<string, string>
+  /** stdio only: working directory for the child process. */
   cwd?: string
+  /** streamable-http only: MCP endpoint URL. */
   url?: string
+  /** streamable-http only: headers attached to MCP requests. */
   headers?: Record<string, string>
+  /** Per-tool-call timeout in milliseconds. */
   toolCallTimeoutMs?: number
+  /** Fail this server's mount when its initial connection or tool sync fails. */
   failOnStartupError?: boolean
+  /** Expose the server's MCP resources as list/read tools. */
   resources?: boolean
+  /** Expose the server's MCP prompts as list/get tools. */
   prompts?: boolean
 }
 
@@ -48,8 +59,9 @@ const entrySchema = z.object({
   prompts: z.boolean().default(true),
 })
 
-/** The fleet document: serverName -> entry. */
+/** The fleet document: the whole settings section value. */
 export interface FleetDocument {
+  /** Mounted servers keyed by serverName; absent or empty mounts none. */
   servers?: Record<string, ServerEntry>
 }
 

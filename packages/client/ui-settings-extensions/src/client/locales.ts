@@ -26,8 +26,10 @@ export const en = {
   saving: 'Applying…',
 }
 
+/** The settings.extensions namespace key union. */
 export type ExtensionsKey = keyof typeof en
 
+/** Chinese strings (same keys as the en dictionary). */
 export const zh: { [Key in keyof typeof en]: string } = {
   'mcp.nav': 'MCP',
   'mcp.title': 'MCP 服务器',

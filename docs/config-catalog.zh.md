@@ -1238,6 +1238,10 @@ export interface StdioConfig {
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /** Expose the server's MCP resources as list/read tools (default true). */
+  resources?: boolean
+  /** Expose the server's MCP prompts as list/get tools (default true). */
+  prompts?: boolean
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -1260,6 +1264,10 @@ export interface StreamableHttpConfig {
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /** Expose the server's MCP resources as list/read tools (default true). */
+  resources?: boolean
+  /** Expose the server's MCP prompts as list/get tools (default true). */
+  prompts?: boolean
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -1279,7 +1287,50 @@ export interface ReconnectConfig {
 
 来源：[`packages/mcp/mcp-client/src/index.ts:98`](../packages/mcp/mcp-client/src/index.ts)
 
+<a id="deepseek-aidsh-mcp-servers"></a>
+
+## `@deepseek-ai/dsh-mcp-servers`
+
+需要：`settings`
+
+```ts config-catalog
+/** The fleet document: the whole settings section value. */
+export interface FleetDocument {
+  /** Mounted servers keyed by serverName; absent or empty mounts none. */
+  servers?: Record<string, ServerEntry>
+}
+
+/** One server entry: the single-server config minus the redundant serverName. */
+interface ServerEntry {
+  /** Transport selecting the connection shape; stdio spawns a child, streamable-http dials a URL. */
+  transport: 'stdio' | 'streamable-http'
+  /** stdio only: executable spawned for the server. */
+  command?: string
+  /** stdio only: arguments passed to the command. */
+  args?: string[]
+  /** stdio only: extra environment merged over the scrubbed ambient environment. */
+  env?: Record<string, string>
+  /** stdio only: working directory for the child process. */
+  cwd?: string
+  /** streamable-http only: MCP endpoint URL. */
+  url?: string
+  /** streamable-http only: headers attached to MCP requests. */
+  headers?: Record<string, string>
+  /** Per-tool-call timeout in milliseconds. */
+  toolCallTimeoutMs?: number
+  /** Fail this server's mount when its initial connection or tool sync fails. */
+  failOnStartupError?: boolean
+  /** Expose the server's MCP resources as list/read tools. */
+  resources?: boolean
+  /** Expose the server's MCP prompts as list/get tools. */
+  prompts?: boolean
+}
+```
+
+来源：[`packages/mcp/mcp-servers/src/index.ts:63`](../packages/mcp/mcp-servers/src/index.ts)
+
 <a id="deepseek-aidsh-message-feedback"></a>
+
 
 ## `@deepseek-ai/dsh-message-feedback`
 
@@ -1896,10 +1947,25 @@ export interface Config {
   watchFollowSymlinks?: boolean
   /** Bundled skill root; defaults to `$DSH_BUNDLED_SKILL_DIR` when default roots are included, otherwise mounts none. */
   bundledSkillDir?: string
+  /**
+   * Discovery sources to include. Absent means every source (the upstream behavior);
+   * a present list filters the built-in and custom roots by their `source` tag
+   * before any directory is scanned, so `['project-dsh', 'user-dsh']` skips every
+   * other-agent tree.
+   */
+  includeSources?: SkillSource[]
+  /**
+   * Kebab-case skill names (or `prefix-*` globs) never offered from this provider
+   * regardless of source; `['okx-*']` hides a whole foreign agent family without
+   * touching its files.
+   */
+  excludeNames?: string[]
 }
 ```
 
-来源：[`packages/skill/skill-filesystem/src/index.ts:49`](../packages/skill/skill-filesystem/src/index.ts)
+依赖：[`SkillSource`](../packages/skill/skill/src/index.ts)
+
+来源：[`packages/skill/skill-filesystem/src/index.ts:56`](../packages/skill/skill-filesystem/src/index.ts)
 
 <a id="deepseek-aidsh-spill-local"></a>
 
@@ -3049,6 +3115,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-permission-presets`（[`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-plan`（[`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings`（[`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-settings-extensions`（[`packages/client/ui-settings-extensions/src/index.ts`](../packages/client/ui-settings-extensions/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-general`（[`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-models`（[`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory`（[`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts)）
