@@ -13,6 +13,7 @@ import type { InputTriggerController } from '@deepseek-ai/dsh-client-ui-input-tr
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { queueReadFaceOf } from '../queue/store.ts'
 import type { ComposerKeyboard, DraftAttachmentId, SessionInputResolver, SessionInput } from './contract.ts'
+import type { DraftFileText } from '../files.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'
 import { SessionInputShell } from './facade.ts'
@@ -31,6 +32,9 @@ interface ConversationAttachmentFace {
     mode: InputSubmitMode,
   ): Promise<void>
   releaseDraftImage(id: DraftAttachmentId): void
+  addDraftFile(file: DraftFileText): void
+  removeDraftFile(id: string): void
+  draftFileList(): readonly DraftFileText[]
 }
 
 /** Session-addressed input facade registry (SessionInputResolver face + composer-layer extras). */

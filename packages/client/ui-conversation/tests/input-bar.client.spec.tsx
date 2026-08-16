@@ -114,6 +114,7 @@ function bench(over?: BenchOptions) {
   const shell = new SessionInputShell({
     actx: SCTX,
     defaultSink: sink,
+    hasDraftFiles: () => false,
     queue: {
       getSnapshot: () => session.getSnapshot().queue,
       subscribe: fn => session.subscribe(fn),
@@ -166,6 +167,9 @@ function bench(over?: BenchOptions) {
       const attachment = over?.attachments?.find(candidate => candidate.id === id)
       return attachment === undefined ? [] : [attachment]
     }),
+    addFile: undefined,
+    removeFile: undefined,
+    draftFileList: undefined,
     resolveSubmitMode: (running, gesture, steeringAvailable) => {
       if (!running || !steeringAvailable) return 'queue'
       const preferred = over?.busyEnter ?? 'queue'

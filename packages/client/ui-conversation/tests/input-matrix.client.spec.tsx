@@ -53,6 +53,9 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
     addImages: () => null,
     removeImage: () => {},
     draftImages: () => [],
+    addFile: undefined,
+    removeFile: undefined,
+    draftFileList: undefined,
     resolveSubmitMode: () => 'queue',
     toggleCommandMenu: vi.fn(),
     useNotices: bindSnapshotSelector(shell.notices),
@@ -70,7 +73,11 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
 
 function bench(over?: { running?: boolean; disabled?: boolean; submit?: (args: string) => Promise<SubmitOutcome> }) {
   const sink = vi.fn()
-  const shell = new SessionInputShell({ actx: SCTX, defaultSink: sink })
+  const shell = new SessionInputShell({
+    actx: SCTX,
+    defaultSink: sink,
+    hasDraftFiles: () => false,
+  })
   const wiring = shell
   const view = mountBar(shell, over)
   const textarea = view.container.querySelector('textarea')!

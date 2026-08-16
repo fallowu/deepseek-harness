@@ -19,7 +19,7 @@ import type {
 import type { InputNotice } from './input/contract.ts'
 import { createChatStore } from './stores.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
-import { extractFile } from './files.ts'
+import { extractFile, type FileIntakeRejection } from './files.ts'
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './input/blocks.ts'
@@ -340,7 +340,16 @@ export function apply(ctx: Context): void {
             return null
           }
           const params = { name: intake.rejection.name }
-          return t('file.rejected.' + intake.rejection.reason, params)
+          // Closed rejection union: every member maps onto a registered
+          // locale key, so the lookup is total without a runtime fallback.
+          const rejectionKeys = {
+            unsupported: 'file.rejected.unsupported',
+            'too-large': 'file.rejected.too-large',
+            'too-many-pages': 'file.rejected.too-many-pages',
+            'too-long': 'file.rejected.too-long',
+            unreadable: 'file.rejected.unreadable',
+          } as const satisfies Record<FileIntakeRejection['reason'], string>
+          return t(rejectionKeys[intake.rejection.reason], params)
         },
         removeFile: (id) => { conversation.removeDraftFile(id) },
         draftFileList: () => conversation.draftFileList(),

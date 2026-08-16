@@ -107,7 +107,12 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
   const actx = sessions.scope(sessionId)!
   const controller = inputTriggers.sessionOf(actx)
   const sink = vi.fn()
-  const shell = new SessionInputShell({ actx, inputTriggers: () => controller, defaultSink: sink })
+  const shell = new SessionInputShell({
+    actx,
+    inputTriggers: () => controller,
+    defaultSink: sink,
+    hasDraftFiles: () => false,
+  })
   // The hub's listener wiring, verbatim.
   actx.on('slash/input-begin-command', req => shell.beginCommand(req.claim, req.span) ? true : undefined)
   actx.on('slash/input-insert-reference', req => shell.insertReference(req.reference, req.span) ? true : undefined)
@@ -139,6 +144,9 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     addImages: () => null,
     removeImage: () => {},
     draftImages: () => [],
+    addFile: undefined,
+    removeFile: undefined,
+    draftFileList: undefined,
     resolveSubmitMode: () => 'queue',
     toggleCommandMenu: (selection) => {
       const snapshot = shell.snapshot

@@ -504,7 +504,7 @@ export interface ComposerBarInjected {
   /** Custom fork: drop one document draft by id. */
   removeFile: ((id: string) => void) | undefined
   /** Custom fork: live document drafts, in registration order. */
-  draftFileList: (() => readonly import('./files.ts').DraftFileText[]) | undefined
+  draftFileList: (() => readonly import('../files.ts').DraftFileText[]) | undefined
   /** Resolve one keyboard submission gesture against the current running state and persisted preference. */
   resolveSubmitMode: (
     running: boolean,

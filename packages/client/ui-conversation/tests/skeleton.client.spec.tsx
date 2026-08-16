@@ -32,7 +32,11 @@ import type { ViewTab } from '../src/client/contract/views.ts'
 /** Machine-backed wiring over a sink spy. */
 function fakeWiring() {
   const sink = vi.fn()
-  const shell = new SessionInputShell({ actx: {} as ClientContext, defaultSink: sink })
+  const shell = new SessionInputShell({
+    actx: {} as ClientContext,
+    defaultSink: sink,
+    hasDraftFiles: () => false,
+  })
   return { wiring: shell, sink, shell }
 }
 
@@ -202,6 +206,9 @@ function mount(
           addImages={() => null}
           removeImage={() => {}}
           draftImages={() => []}
+          addFile={undefined}
+          removeFile={undefined}
+          draftFileList={undefined}
           resolveSubmitMode={() => 'queue'}
           toggleCommandMenu={vi.fn()}
           useNotices={bindSnapshotSelector(wiring.notices)}
