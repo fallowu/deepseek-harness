@@ -35,7 +35,12 @@ import type { ClientContext, ISessions } from '@deepseek-ai/dsh-client-runtime/c
 import type { InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
+// Type-only: pulls the shell's SlotMap merge (the 'settings.section' entry).
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { SkillRow } from './SkillRow.tsx'
+import { SkillSettingsSection, type SkillsSectionInjected } from './SkillSettingsSection.tsx'
+import { SkillSettingsStore } from './settings-store.ts'
 import { en, NS, zh, type SkillKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -128,7 +133,7 @@ export function apply(ctx: ClientContext): void {
 
   // The bound translate resolves against the registered dictionaries with the
   // locale service's own fallback ladder; candidate-time reads stay plain text.
-  const t = ctx.locale.bind(NS)
+  const t = ctx.locale.bind(NS) as SkillsSectionInjected['t']
 
   const source: InputTriggerSource = {
     trigger: '/',
@@ -188,4 +193,23 @@ export function apply(ctx: ClientContext): void {
       clearAll()
     }
   }, 'ui-skill: source')
+
+  // The Skills settings section: the current session's project catalog through
+  // the same skill.list wire the '/' source uses, on the shared connection.
+  const settingsController = new SkillSettingsStore(
+    (ctx.get('connection') as ConnectionHandle).api,
+    sessions,
+  )
+  const useSettingsSnapshot = bindSnapshotSelector(settingsController.store)
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'skills',
+    order: 11,
+    label: () => t('settings.nav'),
+    inject: () => ({
+      controller: settingsController,
+      useSnapshot: useSettingsSnapshot,
+      t,
+    }),
+  }, SkillSettingsSection))
 }
