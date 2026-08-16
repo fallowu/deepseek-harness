@@ -12,11 +12,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
-// Resolved through the build alias to the sibling package's sources: the
-// fleet artifact inlines the single-server plugin, so it carries no
-// dependency on the custom package being Node-resolvable at load time.
-import * as single from 'dsh-custom-mcp-client'
-import type { Config as SingleConfig } from 'dsh-custom-mcp-client'
+// Import the single MCP server plugin directly from the main package
+import { apply as applySingle, Config as SingleConfig } from '@deepseek-ai/dsh-mcp-client'
 
 /** Settings namespace holding the server fleet document. */
 export const MCP_SERVERS_SETTINGS_NAMESPACE = settingsNamespace('mcp-servers')
@@ -89,7 +86,7 @@ export function apply(ctx: Context, _config: FleetDocument): void {
         void mounted.dispose()
       }
       const config = { ...entry, serverName } as unknown as SingleConfig
-      const fiber = ctx.plugin(single, config)
+      const fiber = ctx.plugin(applySingle, config)
       fibers.set(serverName, { dispose: () => fiber.dispose(), config })
     }
   }
