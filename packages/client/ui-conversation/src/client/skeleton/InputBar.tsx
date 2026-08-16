@@ -29,6 +29,7 @@ import type { DraftDecorations } from '../input/decorations.ts'
 import {
   attachmentErrorText, attachmentRailLabels, dropOverlayLabels, imageSizeText, lightboxLabels,
 } from '../image-labels.ts'
+import { isPdf, isTextLike, type DraftFileText } from '../files.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
 import css from './InputBar.module.css'
@@ -45,6 +46,7 @@ export type InputBarProps = ComposerBarProps
 
 export function InputBar({
   useSession, useInput, inputActions, keyboard, addImages, removeImage, draftImages,
+  addFile, removeFile, draftFileList,
   resolveSubmitMode, toggleCommandMenu, stop, command, t,
   renderSlot, useNotices, useLexicon, useMenuLauncher,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
@@ -72,9 +74,16 @@ export function InputBar({
     () => input === undefined || draftImages === undefined ? [] : draftImages(input.imageIds),
     [draftImages, input?.imageIds],
   )
-  const empty = draft.trim() === '' && attachments.length === 0
   const [preview, setPreview] = useState<ComposerAttachment | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  // Custom fork: document drafts (PDF/text) mirror the conversation service;
+  // the local copy only re-renders the chip row, the service owns the data.
+  const [fileDrafts, setFileDrafts] = useState<readonly DraftFileText[]>([])
+  const refreshFileDrafts = useCallback(() => {
+    setFileDrafts(draftFileList === undefined ? [] : [...draftFileList()])
+  }, [draftFileList])
+  useEffect(() => { refreshFileDrafts() }, [refreshFileDrafts, input?.phase])
+  const empty = draft.trim() === '' && attachments.length === 0 && fileDrafts.length === 0
   // Transient error banner (image-intake rejections and prompt failures): the
   // seq keys the Toast so an identical repeated message restarts the
   // hold-then-fade cycle instead of silently reusing the faded one.
@@ -103,6 +112,7 @@ export function InputBar({
   }, [promptError, showToast, t, imageLimits])
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const dragDepthRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const mirrorRef = useRef<HTMLDivElement | null>(null)
@@ -199,7 +209,6 @@ export function InputBar({
   const revealSelectionFocus = (el: HTMLTextAreaElement): void => {
     // selectionStart/End are number|null in lib.dom; the type-aware lint program narrows them.
     const caret = el.selectionDirection === 'backward' ? el.selectionStart : el.selectionEnd
-    // oxlint-disable-next-line typescript/no-unnecessary-condition
     revealCaret(caret ?? el.value.length)
   }
 
@@ -397,7 +406,7 @@ export function InputBar({
       .filter(item => item.kind === 'file')
       .map(item => item.getAsFile())
       .filter((file): file is File => file !== null)
-    if (files.length > 0) intakeImages(files)
+    if (files.length > 0) intakeFiles(files)
     const text = e.clipboardData.getData('text/plain')
     if (text === '') {
       if (files.length > 0) e.preventDefault()
@@ -448,6 +457,27 @@ export function InputBar({
     if (rejected !== null) showToast(rejected)
   }, [addImages, attachments, imageLimits, showToast, t])
 
+  // Custom fork: split one intake batch into images (existing binary path)
+  // and documents (PDF/text extraction). A document rejection announces per
+  // file; successes land as chips and ride the next submit as text blocks.
+  const intakeFiles = useCallback((files: readonly File[]): void => {
+    if (files.length === 0) return
+    const images: File[] = []
+    const documents: File[] = []
+    for (const file of files) {
+      if (file.type.startsWith('image/') && !isPdf(file)) images.push(file)
+      else if (isPdf(file) || isTextLike(file)) documents.push(file)
+      else images.push(file) // surfaces the format error through the image path
+    }
+    if (images.length > 0) intakeImages(images)
+    for (const doc of documents) {
+      void addFile?.(doc).then((message) => {
+        if (message !== null) showToast(message)
+        refreshFileDrafts()
+      })
+    }
+  }, [addFile, intakeImages, refreshFileDrafts, showToast])
+
   // Whole-page file-drop intake (DeepSeek Chat behavior): the listeners live
   // on the document so a drop anywhere over the window adds images, not only
   // over the composer card. Safe as document-level state: the composer-bar
@@ -489,7 +519,7 @@ export function InputBar({
       event.preventDefault()
       reset()
       if (!canAcceptDrop) return
-      intakeImages([...(event.dataTransfer?.files ?? [])])
+      intakeFiles([...(event.dataTransfer?.files ?? [])])
     }
     document.addEventListener('dragenter', onDragEnter)
     document.addEventListener('dragover', onDragOver)
@@ -686,6 +716,29 @@ export function InputBar({
             />
           </div>
         )}
+        {fileDrafts.length > 0 && (
+          <div className={css.fileChips}>
+            {fileDrafts.map(file => (
+              <span key={file.id} className={css.fileChip}>
+                <span className={css.fileChipName} title={file.name}>
+                  {file.pages === undefined ? file.name : file.name + ' · ' + String(file.pages) + 'p'}
+                </span>
+                <button
+                  type="button"
+                  className={css.fileChipRemove}
+                  aria-label={t('file.remove', { name: file.name })}
+                  disabled={locked}
+                  onClick={() => {
+                    removeFile?.(file.id)
+                    refreshFileDrafts()
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         {/* One scrollport, two text layers. The hidden mirror renders draft+'\n' and stretches the
             stack to the draft's FULL height (counting rows by '\n' cannot see soft wraps); the
             absolutely-positioned backdrop and textarea ride that height, and .scroll — capped at 14
@@ -745,6 +798,38 @@ export function InputBar({
                 <IconPlusOutline16 size={14} />
               </button>
             </Tooltip>
+            <Tooltip label={t('input.attach')} side="top" delayMs={500}>
+              <button
+                type="button"
+                className={css.add}
+                aria-label={t('input.attach')}
+                disabled={locked || addImages === undefined}
+                onMouseDown={keepFocus}
+                onClick={() => { fileInputRef.current?.click() }}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <path
+                    d="M13.5 6.5l-5.3 5.3a3.1 3.1 0 01-4.4-4.4l5.7-5.7a2.1 2.1 0 013 3L6.8 10.4a1.1 1.1 0 01-1.5-1.5l4.9-4.9"
+                    stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </Tooltip>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              accept={[
+                ...(imageLimits === undefined ? ['image/*'] : imageLimits.mediaTypes),
+                '.pdf', '.txt', '.md', '.markdown', '.json', '.csv', '.log', '.xml', '.yaml', '.yml', '.js', '.ts',
+              ].join(',')}
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? [])
+                event.target.value = ''
+                if (files.length > 0) intakeFiles(files)
+              }}
+            />
             <div className={css.modes}>
               {accessSelect}
               {renderSlot('conversation.input.plan', { locked })}

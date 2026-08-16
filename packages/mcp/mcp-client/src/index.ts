@@ -23,6 +23,10 @@ import type {} from '@deepseek-ai/dsh-tools'
 
 export type { McpResult } from './tools.ts'
 export type { ReconnectConfig, ResolvedReconnectPolicy } from './connection.ts'
+export { MCP_SERVERS_SETTINGS_NAMESPACE } from './servers.ts'
+export type { FleetDocument } from './servers.ts'
+export type { SurfaceBridgeOptions, SurfaceDisposers } from './surfaces.ts'
+export { syncSurfaces } from './surfaces.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'mcp-client'
@@ -68,6 +72,10 @@ export interface StdioConfig {
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /** Expose the server's MCP resources as list/read tools (default true). */
+  resources?: boolean
+  /** Expose the server's MCP prompts as list/get tools (default true). */
+  prompts?: boolean
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -90,6 +98,10 @@ export interface StreamableHttpConfig {
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /** Expose the server's MCP resources as list/read tools (default true). */
+  resources?: boolean
+  /** Expose the server's MCP prompts as list/get tools (default true). */
+  prompts?: boolean
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -114,6 +126,8 @@ export const Config = z.union([
     cwd: z.string().default(''),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     failOnStartupError: z.boolean().default(false),
+    resources: z.boolean().default(true),
+    prompts: z.boolean().default(true),
     reconnect: Reconnect,
   }),
   z.object({
@@ -123,6 +137,8 @@ export const Config = z.union([
     headers: z.dict(String).default({}),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     failOnStartupError: z.boolean().default(false),
+    resources: z.boolean().default(true),
+    prompts: z.boolean().default(true),
     reconnect: Reconnect,
   }),
 ]) as unknown as z<Config>

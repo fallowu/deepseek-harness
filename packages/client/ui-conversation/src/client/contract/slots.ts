@@ -499,6 +499,12 @@ export interface ComposerBarInjected {
   removeImage: ((id: DraftAttachmentId) => void) | undefined
   /** Resolve ordered input ids to browser-owned draft images. */
   draftImages: ((ids: readonly DraftAttachmentId[]) => readonly ComposerAttachment[]) | undefined
+  /** Custom fork: register one extracted document (PDF/text) draft; returns a failure message or null. */
+  addFile: ((file: File) => Promise<string | null>) | undefined
+  /** Custom fork: drop one document draft by id. */
+  removeFile: ((id: string) => void) | undefined
+  /** Custom fork: live document drafts, in registration order. */
+  draftFileList: (() => readonly import('./files.ts').DraftFileText[]) | undefined
   /** Resolve one keyboard submission gesture against the current running state and persisted preference. */
   resolveSubmitMode: (
     running: boolean,

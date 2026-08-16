@@ -46,6 +46,8 @@ export interface SessionInputDeps {
   steerQueue?: (() => void) | undefined
   /** The plain-message sink (send choreography / materialize fork — the hub owns it). */
   defaultSink(text: string, imageIds: readonly DraftAttachmentId[], mode: InputSubmitMode): void
+  /** Custom fork: whether extracted document drafts are pending (files-only submit). */
+  hasDraftFiles(): boolean
 }
 
 /** Guard tier from the machine phase. */
@@ -196,7 +198,7 @@ export class SessionInputShell implements SessionInput {
    * dismisses and the menu tracks frozen.
    */
   submit(mode: InputSubmitMode = 'queue'): void {
-    if (this.snapshot.draft.trim() === '' && this.imageIds.length > 0) {
+    if (this.snapshot.draft.trim() === '' && (this.imageIds.length > 0 || this.deps.hasDraftFiles())) {
       if (this.snapshot.phase === 'plain') this.deps.defaultSink('', [...this.imageIds], mode)
       return
     }

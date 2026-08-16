@@ -22,6 +22,8 @@ import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { createTransport } from './transport.ts'
 import { syncTools } from './tools.ts'
 import type { ToolBridgeOptions, ToolDisposers } from './tools.ts'
+import { syncSurfaces } from './surfaces.ts'
+import type { SurfaceBridgeOptions, SurfaceDisposers } from './surfaces.ts'
 import type { Config } from './index.ts'
 
 /** Automatic reconnect policy for one MCP server connection. */
@@ -127,6 +129,12 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
     serverName: config.serverName,
     toolCallTimeoutMs: config.toolCallTimeoutMs,
   }
+  const surfaceOpts: SurfaceBridgeOptions = {
+    serverName: config.serverName,
+    toolCallTimeoutMs: config.toolCallTimeoutMs,
+    resources: config.resources !== false,
+    prompts: config.prompts !== false,
+  }
   // The initial sync uses 'throw' when failOnStartupError is configured, so
   // a registration conflict propagates to the startup-await path. Re-syncs
   // and reconnect syncs always contain conflicts.
@@ -141,6 +149,8 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
   let clientClosed: Promise<void> | undefined
   /** Live tool registrations owned by this server; only {@link enqueueSync} and dispose swap it. */
   let disposers: ToolDisposers = new Map()
+  /** Live surface (resources/prompts) registrations; swapped with the same discipline as tools. */
+  let surfaceDisposers: SurfaceDisposers = new Map()
   let reconnectTimer: NodeJS.Timeout | undefined
   /** Consecutive failed connection attempts within the current outage. */
   let failedAttempts = 0
@@ -163,6 +173,10 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
     const run = syncChain.then(async () => {
       if (!isCurrent(generation)) return
       disposers = await syncTools(generation, ctx, syncOpts, disposers)
+      // Surface tools are static per generation: every sync rebuilds the same
+      // capability-gated set through the same dispose-previous/register-next
+      // swap, so tools and surfaces never disagree about which generation is live.
+      surfaceDisposers = await syncSurfaces(generation, ctx, surfaceOpts, surfaceDisposers)
     })
     // The chain tail must survive a failed sync; the enqueuing caller owns reporting.
     syncChain = run.catch(() => {})
@@ -209,6 +223,8 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       syncChain = syncChain.then(() => {
         for (const dispose of disposers.values()) dispose()
         disposers = new Map()
+        for (const dispose of surfaceDisposers.values()) dispose()
+        surfaceDisposers = new Map()
       })
       ctx.logger.error(`${label}: giving up after ${policy.maxAttempts} consecutive failed reconnect attempts — tools unregistered; reload the plugin or restart the Host to reconnect`)
       return
@@ -346,6 +362,8 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       await syncChain
       for (const dispose of disposers.values()) dispose()
       disposers = new Map()
+      for (const dispose of surfaceDisposers.values()) dispose()
+      surfaceDisposers = new Map()
     },
   }
 }

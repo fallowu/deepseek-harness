@@ -1,3 +1,48 @@
+.fileChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 4px 0;
+}
+
+.fileChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  padding: 3px 6px 3px 10px;
+  border: 1px solid var(--dsw-alias-border-secondary);
+  border-radius: 999px;
+  background: var(--dsw-alias-surface-secondary);
+  font-size: 12px;
+}
+
+.fileChipName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileChipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.fileChipRemove:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
 /* One-glyph font: maps ONLY U+FFFC to a blank 4em-advance glyph (every other
    codepoint falls through to the next family). Loaded first in the composer
    font stack, it gives the placeholder a real cell width INSIDE the textarea,

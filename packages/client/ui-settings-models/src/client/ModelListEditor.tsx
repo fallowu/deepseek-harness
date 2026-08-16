@@ -12,6 +12,11 @@
  * A provider that cannot be interrogated (an unreachable endpoint, a protocol
  * with no readable listing) is not a dead end: the failure is shown next to the
  * rows the user can still fill in by hand.
+ *
+ * Custom fork addition: each row's disclosure also edits the pi-ai
+ * `reasoningEfforts` capability — inherit the installed catalog's thinking
+ * levels, declare the model non-reasoning, or compose an explicit
+ * level-to-wire-spelling map, validated locally before any write.
  */
 
 import { useState } from 'react'
@@ -42,6 +47,47 @@ function textOf(model: ModelDraft, key: string): string {
 function numberOf(model: ModelDraft, key: string): number | undefined {
   const value = model[key]
   return typeof value === 'number' ? value : undefined
+}
+
+/** The pi-ai reasoning levels, in the adapter's canonical escalation order. */
+const REASONING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
+
+/** One reasoning level a profile may declare. */
+type ReasoningLevel = (typeof REASONING_LEVELS)[number]
+
+/** A declared efforts dict: level → wire spelling, `null` meaning "offer, send nothing" (only `off`). */
+export type ReasoningEffortsDraft = Partial<Record<ReasoningLevel, string | null>>
+
+/** How one row's thinking capability is declared. */
+type ReasoningMode = 'inherit' | 'off' | 'custom'
+
+/** The row's declared efforts dict, or `undefined` when the field is absent or `false`. */
+function effortsOf(model: ModelDraft): ReasoningEffortsDraft | undefined {
+  const value = model['reasoningEfforts']
+  if (value === false || value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  return value as ReasoningEffortsDraft
+}
+
+/** The row's editing mode: absent field inherits, `false` disables, a dict declares levels. */
+function reasoningModeOf(model: ModelDraft): ReasoningMode {
+  const value = model['reasoningEfforts']
+  if (value === undefined) return 'inherit'
+  if (value === false) return 'off'
+  return 'custom'
+}
+
+/** First local validation failure of one row's declared efforts, or `undefined`. */
+export function validateReasoningEfforts(model: ModelDraft): 'reasoningNoLevels' | 'reasoningWireRequired' | undefined {
+  const mode = reasoningModeOf(model)
+  if (mode !== 'custom') return undefined
+  const efforts = effortsOf(model) ?? {}
+  const levels = Object.keys(efforts) as ReasoningLevel[]
+  if (!levels.some(level => level !== 'off')) return 'reasoningNoLevels'
+  for (const level of levels) {
+    if (level === 'off') continue
+    if (efforts[level] === undefined || efforts[level] === null || efforts[level] === '') return 'reasoningWireRequired'
+  }
+  return undefined
 }
 
 /** What an interrogation needs, taken from the live form. */
@@ -181,6 +227,37 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   const editCapacity = (index: number, field: CapacityField, text: string): void => {
     setEditing(current => new Map(current).set(bufferKey(index, field), text))
     patch(index, { [field]: parseCapacity(text) })
+  }
+
+  /** Replace one row's declared efforts wholesale; `undefined` removes the field so the catalog capability applies again. */
+  const setEfforts = (index: number, efforts: ReasoningEffortsDraft | false | undefined): void => {
+    onChange(models.map((model, at) => {
+      if (at !== index) return model
+      const next: ModelDraft = { ...model }
+      if (efforts === undefined) delete next['reasoningEfforts']
+      else next['reasoningEfforts'] = efforts
+      return next
+    }))
+  }
+
+  /** Flip one level's membership; a newly offered level seeds its wire spelling with the level name. */
+  const toggleLevel = (index: number, level: ReasoningLevel): void => {
+    const current = effortsOf(models[index] ?? {}) ?? {}
+    const next: ReasoningEffortsDraft = { ...current }
+    const levelKey = level as keyof typeof next
+    if (next[levelKey] !== undefined) {
+      const { [levelKey]: _, ...rest } = next
+      Object.assign(next, rest)
+    } else {
+      next[levelKey] = level === 'off' ? null : level
+    }
+    setEfforts(index, next)
+  }
+
+  /** Rewrite one offered level's wire spelling; `off` left empty stores `null` (offer, send nothing). */
+  const setLevelWire = (index: number, level: ReasoningLevel, text: string): void => {
+    const current = effortsOf(models[index] ?? {}) ?? {}
+    setEfforts(index, { ...current, [level]: level === 'off' && text === '' ? null : text })
   }
 
   /** What a capacity field shows: the buffer while typing, else the stored count. */
@@ -417,6 +494,64 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                     onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
                   />
                 </label>
+                <label className={styles['modelField']}>
+                  <span className={styles['modelFieldLabel']}>{t('modelReasoning')}</span>
+                  <select
+                    className={styles['input']}
+                    value={reasoningModeOf(model)}
+                    aria-label={`${t('modelReasoning')} ${index + 1}`}
+                    disabled={disabled}
+                    onChange={(event) => {
+                      const mode = event.target.value as ReasoningMode
+                      setEfforts(index, mode === 'inherit'
+                        ? undefined
+                        : mode === 'off'
+                          ? false
+                          : { low: 'low', medium: 'medium', high: 'high' })
+                    }}
+                  >
+                    <option value="inherit">{t('reasoningInherit')}</option>
+                    <option value="off">{t('reasoningOff')}</option>
+                    <option value="custom">{t('reasoningCustom')}</option>
+                  </select>
+                </label>
+                {reasoningModeOf(model) === 'custom'
+                  ? (
+                    <div className={styles['modelReasoningLevels']}>
+                      {REASONING_LEVELS.map((level) => {
+                        const efforts = effortsOf(model) ?? {}
+                        const wire = efforts[level]
+                        const enabled = wire !== undefined
+                        return (
+                          <div className={styles['modelLevelRow']} key={level}>
+                            <label className={styles['modelLevelCheck']}>
+                              <input
+                                type="checkbox"
+                                checked={enabled}
+                                disabled={disabled}
+                                onChange={() => { toggleLevel(index, level) }}
+                              />
+                              <span>{level}</span>
+                            </label>
+                            <input
+                              className={styles['input']}
+                              type="text"
+                              value={enabled && typeof wire === 'string' ? wire : ''}
+                              placeholder={level === 'off' ? t('reasoningOffHint') : level}
+                              aria-label={`${t('reasoningWire')} ${level} ${index + 1}`}
+                              disabled={disabled || !enabled}
+                              onChange={(event) => { setLevelWire(index, level, event.target.value) }}
+                            />
+                          </div>
+                        )
+                      })}
+                      {(() => {
+                        const failure = validateReasoningEfforts(model)
+                        return failure === undefined ? null : <p className={styles['error']}>{t(failure)}</p>
+                      })()}
+                    </div>
+                  )
+                  : null}
               </div>
             )
             : null}

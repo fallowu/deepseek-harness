@@ -19,6 +19,7 @@ import type {
 import type { InputNotice } from './input/contract.ts'
 import { createChatStore } from './stores.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
+import { extractFile } from './files.ts'
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './input/blocks.ts'
@@ -292,6 +293,9 @@ export function apply(ctx: Context): void {
           addImages: undefined,
           removeImage: undefined,
           draftImages: undefined,
+          addFile: undefined,
+          removeFile: undefined,
+          draftFileList: undefined,
           resolveSubmitMode: (running, gesture, steeringAvailable) =>
             submissionPolicy.resolve(running, gesture, steeringAvailable),
           toggleCommandMenu: undefined,
@@ -326,6 +330,20 @@ export function apply(ctx: Context): void {
           shell.removeImage(id)
         },
         draftImages: ids => conversation.draftImages(ids),
+        // Custom fork: document drafts live in the conversation service (they
+        // ride the prompt as text blocks, not the image wire), so intake is
+        // async extraction and removal is a plain map delete.
+        addFile: async (file) => {
+          const intake = await extractFile(file)
+          if (intake.ok) {
+            conversation.addDraftFile(intake.file)
+            return null
+          }
+          const params = { name: intake.rejection.name }
+          return t('file.rejected.' + intake.rejection.reason, params)
+        },
+        removeFile: (id) => { conversation.removeDraftFile(id) },
+        draftFileList: () => conversation.draftFileList(),
         resolveSubmitMode: (running, gesture, steeringAvailable) =>
           submissionPolicy.resolve(running, gesture, steeringAvailable),
         toggleCommandMenu: inputTriggers === undefined

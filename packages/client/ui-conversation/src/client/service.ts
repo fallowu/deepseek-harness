@@ -15,6 +15,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { ComposerAttachment } from './contract/slots.ts'
+import type { DraftFileText } from './files.ts'
+import { renderFileText } from './files.ts'
 import type { QueueAction, QueueItemId } from './contract/queue.ts'
 import type { ComposerBlocks } from './input/blocks.ts'
 import type { DraftAttachmentId, SessionInputResolver } from './input/contract.ts'
@@ -28,6 +30,12 @@ import type { InputSubmitMode } from './contract/composer-submission.ts'
 export interface IConversation {
   /** The per-session input machine registry (SessionInputResolver face). */
   readonly input: SessionInputResolver
+  /** Custom fork: register one extracted document (PDF/text) draft. */
+  addDraftFile(file: DraftFileText): void
+  /** Custom fork: drop one document draft by id. */
+  removeDraftFile(id: string): void
+  /** Custom fork: every live document draft, in registration order. */
+  draftFileList(): readonly DraftFileText[]
   /**
    * The per-session composer-block registry: how a plugin the composer
    * cannot import makes a session's input inert with its own reason.
@@ -95,6 +103,8 @@ export class ConversationController extends Service implements IConversation {
   readonly blocks: ComposerBlocks
   private readonly draftAttachments = new Map<DraftAttachmentId, ComposerAttachment>()
   private readonly imageUrls = new Map<string, ImageUrlEntry>()
+  /** Custom fork: extracted document drafts (PDF/text files), keyed by draft id. */
+  private readonly draftFiles = new Map<string, DraftFileText>()
   private readonly imageGenerations = new Map<SessionId, number>()
   private readonly createdImageUrls = new Set<string>()
   private disposed = false
@@ -116,6 +126,7 @@ export class ConversationController extends Service implements IConversation {
       this.createdImageUrls.clear()
       this.draftAttachments.clear()
       this.imageUrls.clear()
+      this.draftFiles.clear()
       this.imageGenerations.clear()
     }, 'conversation attachment URL cache')
   }
@@ -150,10 +161,32 @@ export class ConversationController extends Service implements IConversation {
       throw new Error('conversation.sendSession: one or more draft images are no longer available')
     }
     const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
-    const content = [...uploaded, ...(text === '' ? [] : [{ type: 'text' as const, text }])]
+    // Custom fork: extracted document drafts ride as text blocks AHEAD of the
+    // user's own text, one block per file; the ids are consumed on success.
+    const fileBlocks = [...this.draftFiles.values()].map(file => ({ type: 'text' as const, text: renderFileText(file) }))
+    const content = [...uploaded, ...fileBlocks, ...(text === '' ? [] : [{ type: 'text' as const, text }])]
     const result = await session.prompt(content, mode)
     if (!result.ok) throw new Error(`conversation.send failed: ${result.error.code}: ${result.error.message}`)
     this.releaseDraftImages(attachments)
+    this.draftFiles.clear()
+  }
+
+  /**
+   * Custom fork: register one extracted document draft.
+   * @param file - the extracted file payload.
+   */
+  addDraftFile(file: DraftFileText): void {
+    this.draftFiles.set(file.id, file)
+  }
+
+  /** Custom fork: drop one document draft by id. */
+  removeDraftFile(id: string): void {
+    this.draftFiles.delete(id)
+  }
+
+  /** Custom fork: every live document draft, in registration order. */
+  draftFileList(): readonly DraftFileText[] {
+    return [...this.draftFiles.values()]
   }
 
   /**
