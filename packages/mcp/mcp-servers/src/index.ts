@@ -107,7 +107,7 @@ export function apply(ctx: Context, _config: FleetDocument): void {
   function sameEntry(a: unknown, b: ServerEntry): boolean {
     if (typeof a !== 'object' || a === null) return false
     const left = { ...(a as Record<string, unknown>) }
-    const right = { ...(b as Record<string, unknown>) }
+    const right = { ...(b as unknown as Record<string, unknown>) }
     delete left.serverName
     delete right.serverName
     const keys = new Set([...Object.keys(left), ...Object.keys(right)])

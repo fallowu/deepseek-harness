@@ -1,18 +1,30 @@
-import { resolve } from 'node:path'
 import { defineConfig } from 'tsdown'
 
-export default defineConfig({
-  name: 'dsh-custom-mcp-servers',
-  entry: ['src/index.ts'],
-  outDir: 'lib',
-  format: ['esm'],
-  platform: 'node',
-  target: 'es2024',
-  dts: false,
-  fixedExtension: false,
-  clean: false,
-  alias: {
-    'dsh-custom-mcp-client': resolve('../mcp-client/src/index.ts'),
+/** Build the fleet root and invariant companion as independent bundles. */
+export default defineConfig([
+  {
+    name: 'dsh-mcp-servers/index',
+    entry: ['lib/types/index.js'],
+    outDir: 'lib',
+    format: ['esm'],
+    platform: 'node',
+    target: 'es2024',
+    fixedExtension: false,
+    dts: false,
+    clean: false,
+    // The fleet artifact inlines the single-server plugin, so it carries no
+    // dependency on dsh-mcp-client being Node-resolvable at load time.
+    noExternal: [/@deepseek-ai\/dsh-mcp-client/],
   },
-  noExternal: ['dsh-custom-mcp-client'],
-})
+  {
+    name: 'dsh-mcp-servers/invariant',
+    entry: ['lib/types/invariant.js'],
+    outDir: 'lib',
+    format: ['esm'],
+    platform: 'node',
+    target: 'es2024',
+    fixedExtension: false,
+    dts: false,
+    clean: false,
+  },
+])
