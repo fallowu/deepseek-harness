@@ -45,6 +45,13 @@
     "watch": "tsdown --watch"
   },
   "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-invariants": "workspace:^"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-invariants": "workspace:^"
+  },
   "files": [
     "lib/index.js",
     "lib/invariant.js",

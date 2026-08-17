@@ -140,7 +140,13 @@ export function McpSection({ api, t }: ExtensionsInjected): ReactNode {
   }
 
   const patch = (name: string, next: Partial<ServerDraft>): void => {
-    setServers(current => ({ ...current, [name]: { ...current[name], ...next } }))
+    setServers((current) => {
+      const row = current[name]
+      // A row can only be patched while it renders, so a vanished row is a
+      // stale closure's write and becomes a no-op.
+      if (row === undefined) return current
+      return { ...current, [name]: { ...row, ...next } }
+    })
   }
 
   return (
@@ -225,6 +231,16 @@ export function McpSection({ api, t }: ExtensionsInjected): ReactNode {
 /** Every discovery source the skill provider knows, with its meaning. */
 const SKILL_SOURCES = ['project-dsh', 'project-agents', 'custom', 'user-dsh', 'user-agents', 'bundled'] as const
 
+/** Closed source union: every member maps onto a `skills.source.*` locale key. */
+const SOURCE_KEYS = {
+  'project-dsh': 'skills.source.project-dsh',
+  'project-agents': 'skills.source.project-agents',
+  'custom': 'skills.source.custom',
+  'user-dsh': 'skills.source.user-dsh',
+  'user-agents': 'skills.source.user-agents',
+  'bundled': 'skills.source.bundled',
+} as const
+
 /** The skill filters page: source whitelist plus name exclusions. */
 export function SkillsSection({ api, t }: ExtensionsInjected): ReactNode {
   const [included, setIncluded] = useState<ReadonlySet<string>>(new Set(SKILL_SOURCES))
@@ -291,7 +307,7 @@ export function SkillsSection({ api, t }: ExtensionsInjected): ReactNode {
                 })
               }}
             />
-            <span>{t('skills.source.' + source)}</span>
+            <span>{t(SOURCE_KEYS[source])}</span>
           </label>
         ))}
       </div>

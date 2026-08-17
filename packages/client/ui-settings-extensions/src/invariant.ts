@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `dsh-custom-ui-settings-extensions`.
- * @module dsh-custom-ui-settings-extensions/invariant
+ * Package-owned invariant companion for `@deepseek-ai/dsh-client-ui-settings-extensions`.
+ * @module @deepseek-ai/dsh-client-ui-settings-extensions/invariant
  */
 
 /* jscpd:ignore-start */
 import type { Context } from '@deepseek-ai/cordis'
 import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
-const PACKAGE_NAME = 'dsh-custom-ui-settings-extensions'
+const PACKAGE_NAME = '@deepseek-ai/dsh-client-ui-settings-extensions'
 
 /** Cordis companion plugin name. */
 export const name = 'ui-settings-extensions-invariant'
