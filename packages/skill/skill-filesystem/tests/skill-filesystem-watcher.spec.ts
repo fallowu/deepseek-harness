@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
+import { SettingsProvider } from '@deepseek-ai/dsh-settings'
 
 interface FakeWatcherControl {
   emitter: EventEmitter
@@ -95,6 +96,13 @@ async function tempDir(name: string): Promise<string> {
   return await import('node:fs/promises').then(fs => fs.mkdtemp(join(tmpdir(), `dsh-${name}-`)))
 }
 
+/** In-memory settings provider: the smallest real backing the filters section needs. */
+class TestSettings extends SettingsProvider {
+  readonly writable = true
+  protected load(): Promise<Record<string, unknown>> { return Promise.resolve({}) }
+  protected persist(): Promise<void> { return Promise.resolve() }
+}
+
 async function writeSkill(root: string, name: string): Promise<void> {
   const directory = join(root, name)
   await mkdir(directory, { recursive: true })
@@ -124,6 +132,7 @@ describe('skill-filesystem watcher failures', () => {
     await writeSkill(root, 'canonical-skill')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       dshHome: join(alias, '.dsh'),
       agentsHome: join(alias, '.agents'),
@@ -144,6 +153,7 @@ describe('skill-filesystem watcher failures', () => {
     await symlink(target, alias, process.platform === 'win32' ? 'junction' : 'dir')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       includeDefaultRoots: false,
       customSkillDirs: [alias],
@@ -166,6 +176,7 @@ describe('skill-filesystem watcher failures', () => {
     const home = await tempDir('skill-watch-missing-stable')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -199,6 +210,7 @@ describe('skill-filesystem watcher failures', () => {
     watcherHarness.closeErrors = 1
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -240,6 +252,7 @@ describe('skill-filesystem watcher failures', () => {
     await writeSkill(root, 'watched-skill')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -287,6 +300,7 @@ describe('skill-filesystem watcher failures', () => {
     await writeSkill(root, 'removed-skill')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -315,6 +329,7 @@ describe('skill-filesystem watcher failures', () => {
     await writeSkill(root, 'old-skill')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -350,6 +365,7 @@ describe('skill-filesystem watcher failures', () => {
     watcherHarness.deferredReady = 1
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     let provider!: InstanceType<typeof SkillFileSystem.FileSystemSkillProvider>
     const disposeProvider = ctx.skills.registerProvider((control) => {
       provider = new SkillFileSystem.FileSystemSkillProvider(ctx, control, {
@@ -387,6 +403,7 @@ describe('skill-filesystem watcher failures', () => {
     watcherHarness.statGates.push(statGate)
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     let provider!: InstanceType<typeof SkillFileSystem.FileSystemSkillProvider>
     const disposeProvider = ctx.skills.registerProvider((control) => {
       provider = new SkillFileSystem.FileSystemSkillProvider(ctx, control, {
@@ -418,6 +435,7 @@ describe('skill-filesystem watcher failures', () => {
     watcherHarness.deferredReady = 1
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     let provider!: InstanceType<typeof SkillFileSystem.FileSystemSkillProvider>
     const disposeProvider = ctx.skills.registerProvider((control) => {
       provider = new SkillFileSystem.FileSystemSkillProvider(ctx, control, {

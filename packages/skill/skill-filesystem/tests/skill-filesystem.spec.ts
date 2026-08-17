@@ -4,11 +4,19 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
+import { SettingsProvider } from '@deepseek-ai/dsh-settings'
 import { FileSystem, FsError, FsVersion, type FsDirEntry, type FsEditOutcome, type FsEditRequest, type FsInfo, type FsPathInfo, type FsTarget, type FsWriteOutcome } from '@deepseek-ai/dsh-fs'
 import * as SkillFileSystem from '../src/index.ts'
 
 async function tempDir(name: string): Promise<string> {
   return await import('node:fs/promises').then(fs => fs.mkdtemp(join(tmpdir(), `dsh-${name}-`)))
+}
+
+/** In-memory settings provider: the smallest real backing the filters section needs. */
+class TestSettings extends SettingsProvider {
+  readonly writable = true
+  protected load(): Promise<Record<string, unknown>> { return Promise.resolve({}) }
+  protected persist(): Promise<void> { return Promise.resolve() }
 }
 
 async function writeSkill(root: string, name: string, description: string, body = 'Use the skill.'): Promise<void> {
@@ -141,6 +149,7 @@ class TestFileSystem extends FileSystem {
 async function setupLocal(home: string, config: Partial<SkillFileSystem.Config> = {}): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SkillRegistry)
+  await ctx.plugin(TestSettings)
   await ctx.plugin(SkillFileSystem, {
     dshHome: join(home, '.dsh'),
     agentsHome: join(home, '.agents'),
@@ -163,7 +172,31 @@ async function waitFor<T>(read: () => Promise<T>, accept: (value: T) => boolean)
 describe('dsh-skill-filesystem plugin exports', () => {
   it('declares stable plugin metadata', () => {
     expect(SkillFileSystem.name).toBe('skill-filesystem')
-    expect(SkillFileSystem.inject).toEqual(['skills'])
+    expect(SkillFileSystem.inject).toEqual(['skills', 'settings'])
+  })
+
+  it('mounts twice over one settings service without a namespace collision', async () => {
+    const home = await tempDir('skill-two-mounts')
+    const ctx = new Context()
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
+    // Preset standing scopes each mount an instance of this plugin while the
+    // `skill-filters` section is one deployment-level namespace: the second
+    // instance must attach to the first's registration instead of colliding
+    // (distinct provider names keep the one-layer registry out of the way).
+    const mount = (providerName: string) => ctx.plugin(SkillFileSystem, {
+      providerName,
+      dshHome: join(home, '.dsh'),
+      agentsHome: join(home, '.agents'),
+      watch: false,
+    })
+    await mount('first')
+    await mount('second')
+    expect((await ctx.skills.list()).length).toBe(0)
+    // The shared section drives both attached instances: one publish, two
+    // providers applying the exclusion.
+    await ctx.settings.update(SkillFileSystem.SKILL_FILTERS_SETTINGS_NAMESPACE, { excludeNames: ['*'] })
+    expect((await ctx.skills.list()).length).toBe(0)
   })
 })
 
@@ -453,6 +486,7 @@ describe('FileSystemSkillProvider', () => {
       size: 0,
     })
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     await ctx.plugin(SkillFileSystem, { dshHome: join(home, '.dsh'), agentsHome: join(home, '.agents'), watch: false })
 
     expect((await ctx.skills.list({ cwd: nestedCwd })).map(skill => [skill.name, skill.source])).toEqual([
@@ -469,6 +503,7 @@ describe('FileSystemSkillProvider', () => {
     const bundledFs = bundledCtx.fs as TestFileSystem
     bundledFs.failResolvePaths.add(bundled)
     await bundledCtx.plugin(SkillRegistry)
+    await bundledCtx.plugin(TestSettings)
     await bundledCtx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -485,6 +520,7 @@ describe('FileSystemSkillProvider', () => {
     await ctx.plugin(TestFileSystem)
     const fs = ctx.fs as TestFileSystem
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -521,6 +557,7 @@ describe('FileSystemSkillProvider', () => {
     await ctx.plugin(TestFileSystem)
     const fs = ctx.fs as TestFileSystem
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -571,6 +608,7 @@ describe('FileSystemSkillProvider', () => {
     await ctx.plugin(TestFileSystem)
     const fs = ctx.fs as TestFileSystem
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     await ctx.plugin(SkillFileSystem, { dshHome: join(home, '.dsh'), agentsHome: join(home, '.agents'), watch: false })
     expect((await ctx.skills.list()).map(skill => skill.name)).toEqual(['abortable-skill'])
 
@@ -603,6 +641,7 @@ describe('FileSystemSkillProvider', () => {
     const agentsRoot = join(home, '.agents/skills')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -711,6 +750,7 @@ describe('FileSystemSkillProvider', () => {
     await writeSkill(join(second, '.agents/skills'), 'second-project', 'Second project')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -750,6 +790,7 @@ describe('FileSystemSkillProvider', () => {
     await writeSkill(join(home, '.agents/skills'), 'disposed-skill', 'Disposed skill')
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     let provider!: SkillFileSystem.FileSystemSkillProvider
     const disposeProvider = ctx.skills.registerProvider((control) => {
       provider = new SkillFileSystem.FileSystemSkillProvider(ctx, control, {
@@ -785,6 +826,7 @@ describe('FileSystemSkillProvider', () => {
     await symlink(join(external, 'linked-skill'), join(root, 'linked-skill'))
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
     const fiber = await ctx.plugin(SkillFileSystem, {
       dshHome: join(home, '.dsh'),
       agentsHome: join(home, '.agents'),
@@ -809,6 +851,7 @@ describe('FileSystemSkillProvider', () => {
   it('validates watcher tunables at plugin load', async () => {
     const ctx = new Context()
     await ctx.plugin(SkillRegistry)
+    await ctx.plugin(TestSettings)
 
     await expect(ctx.plugin(SkillFileSystem, { watchMaxProjects: 0 })).rejects.toThrow('watchMaxProjects')
     await expect(ctx.plugin(SkillFileSystem, { watchPollIntervalMs: 1.5 })).rejects.toThrow('watchPollIntervalMs')
@@ -829,6 +872,7 @@ describe('FileSystemSkillProvider', () => {
       await writeSkill(bundled, 'env-bundled-skill', 'Env bundled skill')
       const ctx = new Context()
       await ctx.plugin(SkillRegistry)
+      await ctx.plugin(TestSettings)
       await ctx.plugin(SkillFileSystem, { watch: false })
       expect((await ctx.skills.list()).map(skill => skill.name)).toEqual(['env-bundled-skill', 'env-skill'])
 
@@ -837,6 +881,7 @@ describe('FileSystemSkillProvider', () => {
       // drop it — isolated providers never re-claim the app's builtins.
       const isolated = new Context()
       await isolated.plugin(SkillRegistry)
+      await isolated.plugin(TestSettings)
       const customOnly = join(envHome, 'custom-only')
       await writeSkill(customOnly, 'custom-isolated-skill', 'Custom isolated skill')
       await isolated.plugin(SkillFileSystem, {
@@ -853,6 +898,7 @@ describe('FileSystemSkillProvider', () => {
       process.env.DSH_AGENTS_HOME = join(envHome, 'empty-agents')
       const empty = new Context()
       await empty.plugin(SkillRegistry)
+      await empty.plugin(TestSettings)
       SkillFileSystem.apply(empty, { watch: false })
       expect(await empty.skills.list()).toEqual([])
 

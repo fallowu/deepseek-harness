@@ -697,6 +697,31 @@ describe('watch', () => {
     expect(events).toHaveLength(1)
     expect(scope.get()).toEqual({ theme: 'light', fontSize: 14 })
   })
+
+  it('observes a registered namespace without owning it and stops after the disposer', async () => {
+    const { ctx, provider } = await boot()
+    const ns = settingsNamespace('ui-theme')
+    ctx.settings.register(ns, ThemeSchema)
+    expect(ctx.settings.has(ns)).toBe(true)
+    const seen: Array<[unknown, unknown]> = []
+    const dispose = ctx.settings.watch(ns, (next, prev) => { seen.push([next, prev]) })
+    provider.pushExternal({ 'ui-theme': { theme: 'light' } })
+    await vi.waitFor(() => {
+      expect(seen).toHaveLength(1)
+    })
+    dispose()
+    provider.pushExternal({ 'ui-theme': { theme: 'dark' } })
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(seen).toHaveLength(1)
+    expect(ctx.settings.get(ns)).toEqual({ theme: 'dark', fontSize: 14 })
+  })
+
+  it('refuses to observe an unregistered namespace', async () => {
+    const { ctx } = await boot()
+    const ns = settingsNamespace('ui-theme')
+    expect(ctx.settings.has(ns)).toBe(false)
+    expect(() => ctx.settings.watch(ns, () => {})).toThrow(/is not registered/)
+  })
 })
 
 describe('installSettingsSection', () => {

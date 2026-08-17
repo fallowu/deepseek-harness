@@ -8,7 +8,7 @@ This package implements one skill source. It scans local project, custom, and us
 
 ## Plugin
 
-Requires `ctx.skills` (`inject: ['skills']`).
+Requires `ctx.skills` and `ctx.settings` (`inject: ['skills', 'settings']`).
 
 ### Config
 
@@ -19,12 +19,18 @@ Requires `ctx.skills` (`inject: ['skills']`).
 | `dshHome` | `$DSH_HOME` or `~/.dsh` | DeepSeek Harness config root resolved by [`@deepseek-ai/dsh-home-paths`](../../util/home-paths/README.md); scans `skills` under this directory. |
 | `agentsHome` | `$DSH_AGENTS_HOME` or `~/.agents` | Shared agent config root scanned for compatible skills. |
 | `customSkillDirs` | `[]` | Additional local skill roots scanned after project roots and before user roots. |
+| `includeSources` | every source | Discovery sources to include; filters roots by their `source` tag before any directory is scanned. |
+| `excludeNames` | `[]` | Kebab-case skill names or `prefix-*` globs never offered from this provider. |
 | `watch` | `true` | Watch host-local roots and invalidate the local provider when catalog membership or frontmatter may have changed. |
 | `watchUsePolling` | `false` | Use Chokidar polling instead of native events for existing skill roots. |
 | `watchStabilityThresholdMs` | `200` | Stable-write window for Chokidar `add` and `change` events. |
 | `watchPollIntervalMs` | `100` | Chokidar polling/stability interval and missing-path probe interval. |
 | `watchMaxProjects` | `128` | Maximum distinct project roots retained in the watcher LRU. |
 | `watchFollowSymlinks` | `true` | Follow symbolic links while watching existing roots. |
+
+### Settings: the `skill-filters` section
+
+Both filters are overridden live by the `skill-filters` section of the user settings document (`includeSources`, `excludeNames`); the settings page edits that section. Presets mount one provider instance per standing scope while the section is one deployment-level namespace, so the first mounted instance registers the namespace and every later instance attaches to that registration: preset rows mount this plugin config-less, which makes the owning instance's `base` authoritative for the whole process.
 
 ## Discovery
 

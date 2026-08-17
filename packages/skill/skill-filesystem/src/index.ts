@@ -157,26 +157,35 @@ export function apply(ctx: Context, config: Config = {}): void {
     invalidate = () => { control.invalidate() }
     return provider
   })
-  // The `skill-filters` settings section overrides both filters live
-  // (the settings page edits it). Registration resolves the current document once;
-  // the scope watch re-applies on every publish (the provider reads settings.yaml
-  // asynchronously, so the first value can land on either side of this registration).
-  const scope = ctx.settings.register(SKILL_FILTERS_SETTINGS_NAMESPACE, z.object({
-    includeSources: z.array(z.string()),
-    excludeNames: z.array(z.string()).default([]),
-  }), {
-    base: {
-      includeSources: config.includeSources ?? [...SKILL_SOURCES],
-      excludeNames: config.excludeNames ?? [],
-    },
-  })
+  // The `skill-filters` settings section overrides both filters live (the
+  // settings page edits it). Presets mount one provider instance per standing
+  // scope while the section is one deployment-level namespace, so the FIRST
+  // instance registers it and every later instance attaches to that
+  // registration — the service refuses a second registration, and preset rows
+  // mount this plugin config-less, making the owning instance's base
+  // authoritative for the whole process. Registration resolves the current
+  // document once; the watch re-applies on every publish (the provider reads
+  // settings.yaml asynchronously, so the first value can land on either side
+  // of this registration).
+  if (!ctx.settings.has(SKILL_FILTERS_SETTINGS_NAMESPACE)) {
+    ctx.settings.register(SKILL_FILTERS_SETTINGS_NAMESPACE, z.object({
+      includeSources: z.array(z.string()),
+      excludeNames: z.array(z.string()).default([]),
+    }), {
+      base: {
+        includeSources: config.includeSources ?? [...SKILL_SOURCES],
+        excludeNames: config.excludeNames ?? [],
+      },
+    })
+  }
   const applyFilters = (): void => {
-    const current = scope.get() as { includeSources?: readonly string[]; excludeNames?: readonly string[] }
+    const current = ctx.settings.get(SKILL_FILTERS_SETTINGS_NAMESPACE) as
+      { includeSources?: readonly string[]; excludeNames?: readonly string[] }
     provider.setFilters(current.includeSources, current.excludeNames)
     invalidate()
   }
   applyFilters()
-  scope.watch(() => { applyFilters() })
+  ctx.effect(() => ctx.settings.watch(SKILL_FILTERS_SETTINGS_NAMESPACE, () => { applyFilters() }), 'skill-filesystem: settings filters')
   ctx.effect(function* () {
     yield async () => { await provider.dispose() }
   }, 'skill-filesystem watcher')

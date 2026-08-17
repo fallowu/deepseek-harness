@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-skill-filters-namespace-per-preset-collision.md
+2026-08-17-skill-filters-namespace-per-preset-collision.md: 482d2ef83d038846894c4bd45bfea695412b59fd
+2026-08-17-skill-filters-namespace-per-preset-collision.zh.md: 3e5e26c5165d29118a1af42745f729db3a8c075c

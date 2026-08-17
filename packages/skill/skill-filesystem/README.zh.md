@@ -8,7 +8,7 @@
 
 ## 插件
 
-需要 `ctx.skills`（`inject: ['skills']`）。
+需要 `ctx.skills` 和 `ctx.settings`（`inject: ['skills', 'settings']`）。
 
 ### 配置
 
@@ -19,12 +19,18 @@
 | `dshHome` | `$DSH_HOME` 或 `~/.dsh` | 由 [`@deepseek-ai/dsh-home-paths`](../../util/home-paths/README.md) 解析的 DeepSeek Harness 配置根目录；扫描该目录下的 `skills`。 |
 | `agentsHome` | `$DSH_AGENTS_HOME` 或 `~/.agents` | 为兼容 skill 扫描的共享 agent（智能体）配置根目录。 |
 | `customSkillDirs` | `[]` | 在项目根目录之后、用户根目录之前扫描的其他本地 skill 根目录。 |
+| `includeSources` | 全部来源 | 要包含的发现来源；在任何目录扫描之前按根的 `source` 标签过滤。 |
+| `excludeNames` | `[]` | 该提供方永不提供的 kebab-case skill 名或 `prefix-*` 通配符。 |
 | `watch` | `true` | 监视宿主本地根，并在目录成员或 frontmatter 可能发生变化时使本地提供方失效。 |
 | `watchUsePolling` | `false` | 对现有 skill 根使用 Chokidar 轮询，而不是原生事件。 |
 | `watchStabilityThresholdMs` | `200` | Chokidar `add` 和 `change` 事件的稳定写入窗口。 |
 | `watchPollIntervalMs` | `100` | Chokidar 轮询／稳定性间隔和缺失路径探测间隔。 |
 | `watchMaxProjects` | `128` | watcher LRU 中保留的不同项目根数量上限。 |
 | `watchFollowSymlinks` | `true` | 监视现有根时跟随符号链接。 |
+
+### 设置：`skill-filters` 段
+
+两个过滤器都由用户设置文档的 `skill-filters` 段（`includeSources`、`excludeNames`）实时覆盖；设置页编辑的就是这一段。预设按常驻 scope 各挂一份提供方实例，而该段是部署级唯一命名空间，因此首个挂载的实例注册命名空间、后续实例全部挂靠该注册：预设行以无配置方式挂载本插件，属主实例的 `base` 即整进程生效的基准。
 
 ## 发现
 

@@ -456,17 +456,54 @@ export abstract class SettingsProvider extends Service {
     }, `settings.register(${JSON.stringify(String(ns))})`)
     return {
       get: () => registration.resolved as T,
-      watch: (callback) => {
-        const watcher: SettingsWatcher = { callback: callback, tail: Promise.resolve(), active: true }
-        registration.watchers.add(watcher)
-        return () => {
-          watcher.active = false
-          registration.watchers.delete(watcher)
-        }
-      },
+      watch: callback => this.attachWatcher(registration, callback),
       update: patch => this.update(ns, patch),
       replace: section => this.replace(ns, section),
     }
+  }
+
+  /**
+   * Add one observer to a registration's watcher set under the shared
+   * serialization contract (one callback at a time, in commit order,
+   * skipped after disposal).
+   * @param registration - the registration to observe.
+   * @param callback - invoked after each commit with the next and previous values.
+   * @returns the disposer removing this observer.
+   */
+  private attachWatcher(registration: SettingsRegistration, callback: (next: never, prev: never) => void | Promise<void>): () => void {
+    const watcher: SettingsWatcher = { callback: callback, tail: Promise.resolve(), active: true }
+    registration.watchers.add(watcher)
+    return () => {
+      watcher.active = false
+      registration.watchers.delete(watcher)
+    }
+  }
+
+  /**
+   * Whether one namespace is currently registered.
+   * @param ns - the namespace to check.
+   * @returns true while a registration owns the namespace.
+   */
+  has(ns: SettingsNamespace): boolean {
+    return this.registrations.has(ns)
+  }
+
+  /**
+   * Observe one registered namespace's commits without owning it — the read
+   * path for plugins that attach to a namespace another instance registered.
+   * Same contract as {@link SettingsScope.watch}: one callback at a time, in
+   * commit order, contained failures, disposer-gated.
+   * @param ns - the registered namespace to observe.
+   * @param callback - invoked after each commit with the next and previous values.
+   * @returns the disposer removing this observer.
+   * @throws while the namespace is unregistered.
+   */
+  watch(ns: SettingsNamespace, callback: (next: unknown, prev: unknown) => void | Promise<void>): () => void {
+    const registration = this.registrations.get(ns)
+    if (registration === undefined) {
+      throw new Error(`settings namespace "${ns}" is not registered`)
+    }
+    return this.attachWatcher(registration, callback as (next: never, prev: never) => void | Promise<void>)
   }
 
   /**
