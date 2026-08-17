@@ -29,7 +29,9 @@ export interface ObservableSnapshot<T> { getSnapshot(): T; subscribe(fn: () => v
 /** Writable snapshot store (bare data face; React selector hooks are synthesized in web-react). */
 export interface SnapshotStore<T> extends ObservableSnapshot<T> {
   /**
-   * Mutate the state through an immer draft.
+   * Mutate the state through an immer draft. The mutator's return value is
+   * discarded — only draft mutations land, so a mutator that returns a
+   * replacement object is a silent no-op.
    * @param mutator - draft mutator.
    */
   update(mutator: (draft: T) => void): void

@@ -49,7 +49,7 @@ export class SkillSettingsStore {
     const generation = ++this.generation
     const sessionId = this.sessions.list.getSnapshot().current
     if (sessionId === undefined) {
-      this.store.update(() => ({ status: 'no-session', error: null, skills: [] }))
+      this.store.update((s) => { s.status = 'no-session'; s.error = null; s.skills = [] })
       return
     }
     this.store.update((s) => { s.status = 'loading'; s.error = null })
@@ -58,10 +58,10 @@ export class SkillSettingsStore {
       if (generation !== this.generation) return
       if (!response.result.ok) throw new Error(response.result.error.message)
       const skills = response.result.value.skills
-      this.store.update(() => ({ status: 'ready', error: null, skills }))
+      this.store.update((s) => { s.status = 'ready'; s.error = null; s.skills = skills })
     } catch (error) {
       if (generation !== this.generation) return
-      this.store.update(() => ({ status: 'error', error: messageOf(error), skills: [] }))
+      this.store.update((s) => { s.status = 'error'; s.error = messageOf(error); s.skills = [] })
     }
   }
 }
